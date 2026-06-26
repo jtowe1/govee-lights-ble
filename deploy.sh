@@ -3,8 +3,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-CONTAINER=motion-controller
-IMAGE=motion-controller
+CONTAINER=govee-lights-ble
+IMAGE=govee-lights-ble
 
 echo "Pulling latest changes..."
 git pull
