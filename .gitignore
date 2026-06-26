@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+
+# unused/exploratory scripts
+govee_cloud.py
+govee_wifi.py
+govee_control.py
+govee_read.py
+scan.py
+device_info.py
+demo_10s.py
+unifi_sensor.py

@@ -1,0 +1,10 @@
+services:
+  motion-controller:
+    build: .
+    restart: unless-stopped
+    network_mode: host         # needed to receive webhooks and reach D-Bus
+    privileged: true           # needed for BlueZ/D-Bus BLE access
+    volumes:
+      - /var/run/dbus:/var/run/dbus  # share host BlueZ D-Bus socket
+    environment:
+      - WEBHOOK_PORT=8124
