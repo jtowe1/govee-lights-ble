@@ -13,4 +13,5 @@ COPY govee.py .
 COPY motion_controller.py .
 COPY webhook_sensor.py .
 
+ENV PYTHONUNBUFFERED=1
 CMD ["python3", "motion_controller.py", "webhook"]
