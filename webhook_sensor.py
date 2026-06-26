@@ -20,22 +20,25 @@ _first_payload = True  # log raw JSON once so we can inspect the shape
 
 
 def _is_motion_start(data: dict) -> bool:
-    """Return True if this payload represents motion starting."""
-    # UniFi Protect webhook payloads vary slightly by firmware version.
-    # Common shapes:
-    #   { "type": "motion", "start": <timestamp>, "end": null, ... }
-    #   { "event": { "type": "motion", "end": null }, ... }
-    event = data.get("event", data)  # unwrap if nested
+    """Return True if this payload represents motion/person detection."""
+    # UniFi Protect alarm automation webhook:
+    #   { "alarm": { "triggers": [{"key": "person", ...}] }, "timestamp": ... }
+    if "alarm" in data:
+        return True
+    # Raw motion event fallback:
+    #   { "type": "motion", "end": null }
+    event = data.get("event", data)
     etype = event.get("type", "")
-    end   = event.get("end")
-    return "motion" in etype.lower() and end is None
+    return "motion" in etype.lower() and event.get("end") is None
 
 
 def _is_motion_end(data: dict) -> bool:
+    # Alarm webhooks don't have end events — timeout handles it.
+    if "alarm" in data:
+        return False
     event = data.get("event", data)
     etype = event.get("type", "")
-    end   = event.get("end")
-    return "motion" in etype.lower() and end is not None
+    return "motion" in etype.lower() and event.get("end") is not None
 
 
 def make_app(controller) -> web.Application:
