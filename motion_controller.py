@@ -24,22 +24,28 @@ class MotionController:
         self._saved = None
         self._active = False
         self._timer = None
+        self._lock  = asyncio.Lock()
 
     async def trigger_motion(self) -> None:
-        if self._timer:
-            self._timer.cancel()
-            self._timer = None
+        if self._lock.locked():
+            print("[motion] BLE operation in progress — skipping duplicate trigger")
+            return
 
-        if not self._active:
-            print("[motion] Detected — saving scene state")
-            self._saved = await self.light.get_state()
-            print(f"[motion] Saved: color_mode={self._saved.color_response[2]:#04x}, "
-                  f"brightness={self._saved.brightness}%")
-            print("[motion] Turning on white")
-            await self.light.set_white(WHITE_BRIGHTNESS)
-            self._active = True
-        else:
-            print("[motion] Still active — resetting timeout")
+        async with self._lock:
+            if self._timer:
+                self._timer.cancel()
+                self._timer = None
+
+            if not self._active:
+                print("[motion] Detected — saving scene state")
+                self._saved = await self.light.get_state()
+                print(f"[motion] Saved: color_mode={self._saved.color_response[2]:#04x}, "
+                      f"brightness={self._saved.brightness}%")
+                print("[motion] Turning on white")
+                await self.light.set_white(WHITE_BRIGHTNESS)
+                self._active = True
+            else:
+                print("[motion] Still active — resetting timeout")
 
         loop = asyncio.get_event_loop()
         self._timer = loop.call_later(
