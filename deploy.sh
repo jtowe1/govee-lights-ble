@@ -3,17 +3,27 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+# Support both Docker Compose v2 (docker compose) and v1 (docker-compose)
+if docker compose version &>/dev/null 2>&1; then
+  DC="docker compose"
+elif command -v docker-compose &>/dev/null; then
+  DC="docker-compose"
+else
+  echo "Error: neither 'docker compose' nor 'docker-compose' found" >&2
+  exit 1
+fi
+
 echo "Pulling latest changes..."
 git pull
 
 echo "Stopping and removing existing container..."
-docker compose down
+$DC down
 
 echo "Building image..."
-docker compose build --no-cache
+$DC build --no-cache
 
 echo "Starting container..."
-docker compose up -d
+$DC up -d
 
 echo "Done. Logs:"
-docker compose logs -f
+$DC logs -f
