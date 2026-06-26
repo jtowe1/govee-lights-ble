@@ -7,7 +7,7 @@ echo "Pulling latest changes..."
 git pull
 
 echo "Stopping and removing existing container..."
-docker compose down --remove-orphans
+docker compose down
 
 echo "Building image..."
 docker compose build --no-cache
