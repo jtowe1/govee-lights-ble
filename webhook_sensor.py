@@ -13,6 +13,7 @@ import asyncio
 import json
 import os
 from aiohttp import web
+from govee import _ts
 
 PORT = int(os.getenv("WEBHOOK_PORT", "8123"))
 
@@ -50,11 +51,11 @@ def make_app(controller) -> web.Application:
             data = await request.json()
         except Exception:
             text = await request.text()
-            print(f"[webhook] Non-JSON payload: {text[:200]}")
+            print(f"[{_ts()}] [webhook] Non-JSON payload: {text[:200]}")
             return web.Response(status=400, text="expected JSON")
 
         if _first_payload:
-            print(f"[webhook] First payload (raw):\n{json.dumps(data, indent=2)}\n")
+            print(f"[{_ts()}] [webhook] First payload (raw):\n{json.dumps(data, indent=2)}\n")
             _first_payload = False
 
         if _is_motion_start(data):
@@ -62,7 +63,7 @@ def make_app(controller) -> web.Application:
         elif _is_motion_end(data):
             asyncio.ensure_future(controller.clear_motion())
         else:
-            print(f"[webhook] Unhandled event type: {data.get('type') or data.get('event', {}).get('type')}")
+            print(f"[{_ts()}] [webhook] Unhandled event type: {data.get('type') or data.get('event', {}).get('type')}")
 
         return web.Response(text="ok")
 
@@ -76,8 +77,8 @@ async def run(controller) -> None:
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
-    print(f"[webhook] Listening on http://0.0.0.0:{PORT}/motion")
-    print(f"[webhook] Point UniFi Protect webhook → http://<this-mac-ip>:{PORT}/motion\n")
+    print(f"[{_ts()}] [webhook] Listening on http://0.0.0.0:{PORT}/motion")
+    print(f"[{_ts()}] [webhook] Point UniFi Protect webhook → http://<this-mac-ip>:{PORT}/motion\n")
     # Run forever alongside the rest of the event loop
     await asyncio.Event().wait()
 

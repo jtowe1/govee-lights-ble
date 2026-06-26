@@ -12,7 +12,7 @@ Run modes:
 
 import asyncio
 import sys
-from govee import GoveeLight
+from govee import GoveeLight, _ts
 
 NO_MOTION_TIMEOUT = 3 * 60
 WHITE_BRIGHTNESS  = 100
@@ -28,24 +28,30 @@ class MotionController:
 
     async def trigger_motion(self) -> None:
         if self._lock.locked():
-            print("[motion] BLE operation in progress — skipping duplicate trigger")
+            print(f"[{_ts()}] [motion] BLE operation in progress — skipping duplicate trigger")
             return
 
-        async with self._lock:
-            if self._timer:
-                self._timer.cancel()
-                self._timer = None
+        try:
+            async with self._lock:
+                if self._timer:
+                    self._timer.cancel()
+                    self._timer = None
 
-            if not self._active:
-                print("[motion] Detected — saving scene state")
-                self._saved = await self.light.get_state()
-                print(f"[motion] Saved: color_mode={self._saved.color_response[2]:#04x}, "
-                      f"brightness={self._saved.brightness}%")
-                print("[motion] Turning on white")
-                await self.light.set_white(WHITE_BRIGHTNESS)
-                self._active = True
-            else:
-                print("[motion] Still active — resetting timeout")
+                if not self._active:
+                    print(f"[{_ts()}] [motion] Detected — saving scene state")
+                    self._saved = await self.light.get_state()
+                    print(f"[{_ts()}] [motion] Saved: color_mode={self._saved.color_response[2]:#04x}, "
+                          f"brightness={self._saved.brightness}%")
+                    print(f"[{_ts()}] [motion] Turning on white")
+                    await self.light.set_white(WHITE_BRIGHTNESS)
+                    self._active = True
+                else:
+                    print(f"[{_ts()}] [motion] Still active — resetting timeout")
+        except Exception as e:
+            print(f"[{_ts()}] [motion] ERROR in trigger_motion: {e}")
+            self._active = False
+            self._saved = None
+            return
 
         loop = asyncio.get_event_loop()
         self._timer = loop.call_later(
@@ -61,12 +67,16 @@ class MotionController:
     async def _on_timeout(self) -> None:
         if not self._active:
             return
-        print("[motion] No motion — restoring scene")
+        print(f"[{_ts()}] [motion] No motion — restoring scene")
         self._active = False
         self._timer = None
         if self._saved:
-            await self.light.restore_state(self._saved)
-            self._saved = None
+            try:
+                await self.light.restore_state(self._saved)
+            except Exception as e:
+                print(f"[{_ts()}] [motion] ERROR restoring state: {e}")
+            finally:
+                self._saved = None
 
 
 # ── Mock driver ────────────────────────────────────────────────────────────────

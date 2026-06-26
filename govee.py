@@ -3,7 +3,15 @@
 
 import asyncio
 from dataclasses import dataclass
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from bleak import BleakScanner, BleakClient
+
+_EASTERN = ZoneInfo("America/New_York")
+
+
+def _ts() -> str:
+    return datetime.now(_EASTERN).strftime("%Y-%m-%d %H:%M:%S %Z")
 
 CONTROL_CHAR = "00010203-0405-0607-0809-0a0b0c0d2b11"
 NOTIFY_CHAR  = "00010203-0405-0607-0809-0a0b0c0d2b10"
@@ -46,7 +54,7 @@ class GoveeLight:
     async def _resolve(self) -> str:
         if self._address:
             return self._address
-        print(f"Scanning for {self.name} (up to 60s)...")
+        print(f"[{_ts()}] Scanning for {self.name} (up to 60s)...")
         found: asyncio.Future[str] = asyncio.get_event_loop().create_future()
 
         def on_detect(device, _adv) -> None:
@@ -61,7 +69,7 @@ class GoveeLight:
                     f"Device '{self.name}' not found — is it plugged in and advertising?"
                 )
 
-        print(f"Found: {self.name} @ {self._address}")
+        print(f"[{_ts()}] Found: {self.name} @ {self._address}")
         return self._address
 
     async def _query(self, client: BleakClient, pkt: bytes) -> bytes:
@@ -91,20 +99,25 @@ class GoveeLight:
         return LightState(power=power, brightness=brightness, color_response=color_resp)
 
     async def _connect(self) -> BleakClient:
-        """Return a connected BleakClient, re-scanning if the cached address is stale."""
-        from bleak.exc import BleakDeviceNotFoundError
-        address = await self._resolve()
-        try:
-            client = BleakClient(address, timeout=20.0)
-            await client.connect()
-            return client
-        except BleakDeviceNotFoundError:
-            print("Address stale, re-scanning...")
-            self._address = None
+        """Return a connected BleakClient, retrying on transient BLE errors."""
+        from bleak.exc import BleakDeviceNotFoundError, BleakError
+        for attempt in range(3):
             address = await self._resolve()
-            client = BleakClient(address, timeout=20.0)
-            await client.connect()
-            return client
+            try:
+                client = BleakClient(address, timeout=20.0)
+                await client.connect()
+                return client
+            except BleakDeviceNotFoundError:
+                print(f"[{_ts()}] Address stale, re-scanning...")
+                self._address = None
+            except BleakError as e:
+                if attempt < 2:
+                    print(f"[{_ts()}] BLE connect error ({e}), retrying in 3s...")
+                    self._address = None
+                    await asyncio.sleep(3.0)
+                else:
+                    raise
+        raise RuntimeError("Failed to connect after retries")
 
     async def _send(self, pkt: bytes) -> None:
         client = await self._connect()
@@ -147,5 +160,5 @@ class GoveeLight:
             await client.write_gatt_char(CONTROL_CHAR, power_cmd, response=True)
         finally:
             await client.disconnect()
-        print(f"Restored: power={'on' if state.power else 'off'}, brightness={state.brightness}%, "
+        print(f"[{_ts()}] Restored: power={'on' if state.power else 'off'}, brightness={state.brightness}%, "
               f"color_mode={state.color_response[2]:#04x}")
